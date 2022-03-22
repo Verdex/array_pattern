@@ -109,11 +109,152 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
-    // TODO test calling other matcher that fails resets stream from its perspective
-    // TODO test calling other matcher results in correct fatal index
-    // TODO test calling other matcher results in correct fatal end of file
-    // TODO test calling other matcher results in correct error
-    // TODO test calling other matcher results in correct error end of file
+    #[test]
+    fn seq_other_matcher_resets_iterator_on_failure() -> Result<(), MatchError> {
+        seq!(other<'a>: u8 => () = _a <= _, _b <= _, _c <= _, _d <= 0xFF, {
+            ()
+        });
+
+        seq!(single<'a>: u8 => u8 = a <= _, {
+            a
+        });
+
+        seq!(main<'a>: u8 => () = _a <= other, {
+            ()
+        });
+
+        let v : Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(_) ) );
+
+        let o = single(&mut i)?;
+
+        assert_eq!( o.item, 0xFF );
+        Ok(())
+    }
+
+    #[test]
+    fn seq_other_matcher_error_eof_as_fatal_eof() {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= _, b <= _, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![0xFF, 0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile ) ) );
+    }
+
+    #[test]
+    fn seq_other_matcher_error_as_fatal() {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= 0xFF, b <= 0xFF, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![0xFF, 0xFF, 0x00, 0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(MatchError::Fatal(2) ) ) );
+    }
+
+    #[test]
+    fn seq_other_matcher_fatal_eof_as_fatal_eof() {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= 0xFF, b <= 0xFF, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile ) ) );
+    }
+
+    #[test]
+    fn seq_other_matcher_fatal_as_fatal() {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= 0xFF, b <= 0xFF, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![0xFF, 0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(MatchError::Fatal(1) ) ) );
+    }
+
+    #[test]
+    fn seq_other_matcher_error_eof_as_error_eof() {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= 0xFF, b <= _, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(MatchError::ErrorEndOfFile ) ) );
+    }
+
+    #[test]
+    fn seq_other_matcher_error_as_error() {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= 0xFF, b <= _, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![0x00, 0x11, 0x22, 0x33];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i);
+
+        assert!( matches!( o, Err(MatchError::Error(0) ) ) );
+    }
 
     #[test]
     fn seq_should_call_other_matcher() -> Result<(), MatchError> {
