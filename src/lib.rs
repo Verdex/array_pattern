@@ -173,6 +173,17 @@ mod tests {
 
     #[test]
     fn should_handle_string_match() {
+        struct C(char);
 
+        seq!(m<'a>: char => C = a <= 'a', {
+            C(a)
+        });
+
+        let v = "aaa";
+        let mut i = v.char_indices();
+
+        let o = m(&mut i);
+
+        assert!( matches!( o, MatchResult::Success{ item: C('a'), .. } ) );
     }
 }
