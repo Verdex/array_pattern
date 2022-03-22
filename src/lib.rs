@@ -28,7 +28,22 @@ pub struct Success<T> {
 #[macro_export]
 macro_rules! seq {
 
-    // TODO be able to call other parsers
+    (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
+        let $n = $matcher($input)?;
+        // TODO start and end need to be set
+        seq!(fatal, $rp, $input, $start, $end, $($rest)*);
+    };
+
+    (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
+        #[allow(unreachable_patterns)]
+        let $n = match $matcher($input) {
+            Ok(v) => v,
+            e @ Err(MatchError::Fatal(_)) => e,
+            Err(_) => Err(MatchError::Fatal(0)), // TODO if Error has a usize, then we can grab it here
+            // TODO need to handle end of file differently
+        };
+        seq!(fatal, $rp, $input, $start, $end, $($rest)*);
+    };
 
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         #[allow(unreachable_patterns)]
