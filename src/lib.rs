@@ -111,7 +111,41 @@ mod tests {
 
     #[test]
     fn should_handle_multiple_item_match() {
+        enum Input {
+            A, 
+            B,
+        }
 
+        enum OutputCase {
+            A,
+            B,
+        }
+
+        struct Output { 
+            a : OutputCase,
+            b : OutputCase,
+        }
+
+        seq!(m<'a>: &'a Input => Output = a <= Input::A, b <= Input::B, { 
+            let o1 = match a {
+                Input::A => OutputCase::A,
+                Input::B => OutputCase::B,
+            };
+
+            let o2 = match b {
+                Input::A => OutputCase::A,
+                Input::B => OutputCase::B,
+            };
+
+            Output { a: o1, b: o2 }
+        });
+
+        let v = vec![Input::A, Input::B];
+        let mut i = v.iter().enumerate();
+
+        let o = m(&mut i);
+
+        assert!( matches!( o, MatchResult::Success{ item: Output { a: OutputCase::A, b: OutputCase::B }, .. } ) );
     }
 
     #[test]
