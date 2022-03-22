@@ -83,11 +83,35 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
-    // TODO test reset on failure
     // TODO test fatal end of file
     // TODO test fatal index
     // TODO test success single index size
     // TODO test success multi index size
+
+    #[test]
+    fn seq_should_reset_on_failure() -> Result<(), MatchError> {
+
+        seq!(f<'a>: char => char = _a <= 'a', _b <= 'b', {
+            'x'
+        });
+
+        seq!(s<'a>: char => char = a <= _, {
+            a
+        });
+
+        let v = "aac";
+        let mut i = v.char_indices();
+
+        let failure = f(&mut i);
+
+        assert!( matches!( failure, Err(MatchError::Fatal(_) ) ) );
+
+        let success = s(&mut i)?;
+
+        assert_eq!( success.item, 'a' );
+
+        Ok(())
+    }
 
     #[test]
     fn seq_should_handle_single_item_match() {
