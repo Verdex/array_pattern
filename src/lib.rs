@@ -13,30 +13,38 @@ pub enum MatchResult<T> {
 #[macro_export]
 macro_rules! seq {
 
-    // TODO error out by mentioning the index number
     // TODO be able to call other parsers
+    // TODO reset on failure
 
-    ($input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
+    (err, $input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
-            Some(y @ $p) => y,
-            _ => { return None; },
+            Some(y @ (i, $p)) => y,
+            _ => { return MatchResult::Error; },
         };
-        seq!($input, $($rest)*);
+        seq!(fatal, $input, $($rest)*);
     };
 
-    ($input:ident, $b:block) => {
-        return Some($b);
+    (fatal, $input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
+        let $n = match $input.next() {
+            Some(y @ (i, $p)) => y,
+            _ => { return MatchResult::Fatal(0); },
+        };
+        seq!(fatal, $input, $($rest)*);
+    };
+
+    ($mode:ident, $input:ident, $b:block) => {
+        return MatchResult::Success(0, $b);
     };
 
     ($name:ident<$o:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
-        fn $name<$o>(input : &mut impl Iterator<Item = $in_t>) -> Option<$out_t> {
-            seq!(input, $($rest)*);
+        fn $name<$o>(input : &mut impl Iterator<Item = (usize, $in_t)>) -> MatchResult<$out_t> {
+            seq!(err, input, $($rest)*);
         }
     };
 
     ($name:ident : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
-        fn $name(input : &mut impl Iterator<Item = $in_t>) -> Option<$out_t> {
-            seq!(input, $($rest)*);
+        fn $name(input : &mut impl Iterator<Item = (usize, $in_t)>) -> MatchResult<$out_t> {
+            seq!(err, input, $($rest)*);
         }
     };
 }
