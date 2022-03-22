@@ -28,7 +28,6 @@ pub struct Success<T> {
 #[macro_export]
 macro_rules! seq {
 
-    // TODO pat has given me some problems with literals
     // TODO be able to call other parsers
 
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
@@ -84,6 +83,28 @@ macro_rules! seq {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn seq_should_handle_bytes() -> Result<(), MatchError> {
+        struct Output {
+            a : u8,
+            b : u8,
+        }
+
+        seq!(p<'a>: u8 => Output = a <= 0x00, b <= 0xFF, {
+            Output { a, b }
+        });
+
+        let v : Vec<u8> = vec![0x00, 0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = p(&mut i)?;
+
+        assert_eq!( o.item.a, 0x00 );
+        assert_eq!( o.item.b, 0xFF );
+
+        Ok(())
+    }
 
     #[test]
     fn seq_should_show_multiple_index_success_with_more_rules() -> Result<(), MatchError> {
