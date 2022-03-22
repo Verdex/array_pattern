@@ -3,6 +3,13 @@
 // TODO zero or more
 // TODO one or more
 
+#[derive(Debug)]
+pub enum MatchResult<T> {
+    Success(usize, T),
+    Error,
+    Fatal(usize)
+}
+
 #[macro_export]
 macro_rules! seq {
 
