@@ -32,15 +32,21 @@ macro_rules! seq {
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
         let v = $matcher($input)?;
         let $n = v.item;
+        $start = v.start;
+        $end = v.end;
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
     };
 
     (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
         let $n = match $matcher($input) {
-            Ok(v) => v.item,
+            Ok(v) => {
+                $end = v.end;
+                v.item
+            },
             Err(MatchError::Fatal(i)) => return Err(MatchError::Fatal(i)),
-            Err(_) => return Err(MatchError::Fatal(0)), // TODO if Error has a usize, then we can grab it here
-            // TODO need to handle end of file differently
+            Err(MatchError::Error(i)) => return Err(MatchError::Fatal(i)),
+            Err(MatchError::FatalEndOfFile) => return Err(MatchError::FatalEndOfFile),
+            Err(MatchError::ErrorEndOfFile) => return Err(MatchError::FatalEndOfFile),
         };
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
     };
@@ -107,7 +113,7 @@ mod tests {
     // TODO test calling other matcher results in correct fatal index
     // TODO test calling other matcher results in correct fatal end of file
     // TODO test calling other matcher results in correct error
-    // TODO test calling other matcher results in correct start/end values
+    // TODO test calling other matcher results in correct error end of file
 
     #[test]
     fn seq_should_call_other_matcher() -> Result<(), MatchError> {
@@ -121,15 +127,18 @@ mod tests {
             Main(a, b)
         });
 
-        let v : Vec<u8> = vec![0x00, 0x11, 0x22, 0x33];
+        let v : Vec<u8> = vec![0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x11, 0x22, 0x33];
         let mut i = v.into_iter().enumerate();
 
+        let _ = main(&mut i)?;
         let o = main(&mut i)?;
 
         assert_eq!( o.item.0.0, 0x00 );
         assert_eq!( o.item.0.1, 0x11 );
         assert_eq!( o.item.1.0, 0x22 );
         assert_eq!( o.item.1.1, 0x33 );
+        assert_eq!( o.start, 4 );
+        assert_eq!( o.end, 7 );
 
         Ok(())
     }
