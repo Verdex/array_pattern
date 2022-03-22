@@ -2,6 +2,7 @@
 // TODO maybe
 // TODO zero or more
 // TODO one or more
+// TODO or ?
 
 #[derive(Debug)]
 pub enum MatchError {
@@ -95,11 +96,35 @@ macro_rules! seq {
             seq!(err, _rp, input, _start, _end, $($rest)*);
         }
     };
+
+    (maybe ~ $matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
+        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Option<Success<$out_t>>, MatchError> {
+            let mut _rp = input.clone();
+            let mut _start : usize = 0;
+            let mut _end : usize = 0;
+            let mut matcher = || { seq!(err, _rp, input, _start, _end, $($rest)*); };
+            let result = matcher();
+            match result {
+                Ok(v) => Ok(Some(v)),
+                Err(MatchError::Error(_)) => Ok(None),
+                Err(MatchError::ErrorEndOfFile) => Ok(None),
+                Err(MatchError::Fatal(i)) => Err(MatchError::Fatal(i)),
+                Err(MatchError::FatalEndOfFile) => Err(MatchError::FatalEndOfFile),
+            }
+        }
+    };
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maybe_() {
+        seq!(maybe ~ something<'a> : u8 => u8 = a <= _, {
+            a
+        });
+    }
 
     #[test]
     fn seq_other_matcher_resets_iterator_on_failure() -> Result<(), MatchError> {
