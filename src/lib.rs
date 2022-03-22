@@ -32,6 +32,7 @@ macro_rules! seq {
     // TODO be able to call other parsers
 
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
+        #[allow(unreachable_patterns)]
         let $n = match $input.next() {
             Some((i, item @ $p)) => {
                 $start = i;
@@ -47,6 +48,7 @@ macro_rules! seq {
     };
 
     (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
+        #[allow(unreachable_patterns)]
         let $n = match $input.next() {
             Some((i, item @ $p)) => {
                 $end = i;
@@ -83,10 +85,68 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
-    // TODO test fatal end of file
-    // TODO test fatal index
     // TODO test success single index size
     // TODO test success multi index size
+
+    #[test]
+    fn seq_should_indicate_first_item_error_from_end_of_file() {
+
+        seq!(f<'a>: char => char = _a <= _, _b <= _, {
+            'x'
+        });
+
+        let v = "";
+        let mut i = v.char_indices();
+
+        let failure = f(&mut i);
+
+        assert!( matches!( failure, Err(MatchError::Error ) ) );
+    }
+
+    #[test]
+    fn seq_should_indicate_first_item_error_from_mismatch() {
+
+        seq!(f<'a>: char => char = _a <= 'a', _b <= _, {
+            'x'
+        });
+
+        let v = "b";
+        let mut i = v.char_indices();
+
+        let failure = f(&mut i);
+
+        assert!( matches!( failure, Err(MatchError::Error ) ) );
+    }
+
+    #[test]
+    fn seq_should_indicate_fatal_line_number() {
+
+        seq!(f<'a>: char => char = _a <= _, _b <= 'b', {
+            'x'
+        });
+
+        let v = "ac";
+        let mut i = v.char_indices();
+
+        let failure = f(&mut i);
+
+        assert!( matches!( failure, Err(MatchError::Fatal(1) ) ) );
+    }
+
+    #[test]
+    fn seq_should_indicate_fatal_end_of_file() {
+
+        seq!(f<'a>: char => char = _a <= _, _b <= _, {
+            'x'
+        });
+
+        let v = "a";
+        let mut i = v.char_indices();
+
+        let failure = f(&mut i);
+
+        assert!( matches!( failure, Err(MatchError::FatalEndOfFile ) ) );
+    }
 
     #[test]
     fn seq_should_reset_on_failure() -> Result<(), MatchError> {
