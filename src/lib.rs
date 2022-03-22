@@ -13,7 +13,8 @@ pub enum MatchResult<T> {
 
 #[derive(Debug)]
 pub enum MatchError {
-    Error,
+    Error(usize),
+    ErrorEndOfFile,
     Fatal(usize), 
     FatalEndOfFile,
 }
@@ -52,9 +53,13 @@ macro_rules! seq {
                 $end = i;
                 item
             },
+            Some((i, _)) => {
+                std::mem::swap(&mut $rp, $input); 
+                return Err(MatchError::Error(i)); 
+            },
             _ => { 
                 std::mem::swap(&mut $rp, $input); 
-                return Err(MatchError::Error); 
+                return Err(MatchError::ErrorEndOfFile); 
             },
         };
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
@@ -234,7 +239,7 @@ mod tests {
 
         let failure = f(&mut i);
 
-        assert!( matches!( failure, Err(MatchError::Error ) ) );
+        assert!( matches!( failure, Err(MatchError::ErrorEndOfFile ) ) );
     }
 
     #[test]
@@ -249,7 +254,7 @@ mod tests {
 
         let failure = f(&mut i);
 
-        assert!( matches!( failure, Err(MatchError::Error ) ) );
+        assert!( matches!( failure, Err(MatchError::Error(_) ) ) );
     }
 
     #[test]
