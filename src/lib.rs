@@ -7,8 +7,8 @@
 pub enum MatchResult<T> {
     Success(usize, T),  // TODO Success { start: usize, end: usize, item: T}
     Error,
-    Fatal(usize) // TODO Fatal { start: usize, end: usize }
-    // TODO FatalEndOfFile ?
+    Fatal(usize), 
+    FatalEndOfFile,
 }
 
 #[macro_export]
@@ -32,10 +32,13 @@ macro_rules! seq {
     (fatal, $rp:ident, $input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
             Some(y @ (i, $p)) => y,
-            // TODO Some((i, _)) => ...
+            Some((i, _)) => {
+                std::mem::swap(&mut $rp, $input); 
+                return MatchResult::Fatal(i);  
+            },
             _ => { 
                 std::mem::swap(&mut $rp, $input); 
-                return MatchResult::Fatal(0);  // TODO FatalEndOfFile?
+                return MatchResult::FatalEndOfFile;  
             },
         };
         seq!(fatal, $rp, $input, $($rest)*);
@@ -45,8 +48,8 @@ macro_rules! seq {
         return MatchResult::Success(0, $b);
     };
 
-    ($name:ident<$o:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
-        fn $name<$o>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> MatchResult<$out_t> {
+    ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
+        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> MatchResult<$out_t> {
             let mut rp = input.clone();
             seq!(err, rp, input, $($rest)*);
         }
