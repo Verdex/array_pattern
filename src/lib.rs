@@ -149,7 +149,26 @@ mod tests {
 
     #[test]
     fn should_handle_owned_item_match() {
+        enum Input {
+            A, 
+            B,
+        }
 
+        struct Output<'a> { 
+            a : &'a Input,
+            b : &'a Input,
+        }
+
+        seq!(m<'a>: &'a Input => Output<'a> = a <= Input::A, b <= Input::B, { 
+            Output { a: a, b: b }
+        });
+
+        let v = vec![Input::A, Input::B];
+        let mut i = v.iter().enumerate();
+
+        let o = m(&mut i);
+
+        assert!( matches!( o, MatchResult::Success{ item: Output { a: Input::A, b: Input::B }, .. } ) );
     }
 
     #[test]
