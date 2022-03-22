@@ -29,17 +29,16 @@ pub struct Success<T> {
 macro_rules! seq {
 
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
-        let $n = $matcher($input)?;
-        // TODO start and end need to be set
+        let v = $matcher($input)?;
+        let $n = v.item;
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
     };
 
     (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
-        #[allow(unreachable_patterns)]
         let $n = match $matcher($input) {
-            Ok(v) => v,
-            e @ Err(MatchError::Fatal(_)) => e,
-            Err(_) => Err(MatchError::Fatal(0)), // TODO if Error has a usize, then we can grab it here
+            Ok(v) => v.item,
+            Err(MatchError::Fatal(i)) => return Err(MatchError::Fatal(i)),
+            Err(_) => return Err(MatchError::Fatal(0)), // TODO if Error has a usize, then we can grab it here
             // TODO need to handle end of file differently
         };
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
@@ -87,10 +86,10 @@ macro_rules! seq {
 
     ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
         fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<$out_t>, MatchError> {
-            let mut rp = input.clone();
+            let mut _rp = input.clone();
             let mut _start : usize = 0;
             let mut _end : usize = 0;
-            seq!(err, rp, input, _start, _end, $($rest)*);
+            seq!(err, _rp, input, _start, _end, $($rest)*);
         }
     };
 }
@@ -105,6 +104,30 @@ mod tests {
     // TODO test calling other matcher results in correct error
     // TODO test calling other matcher results in correct start/end values
 
+    #[test]
+    fn seq_should_call_other_matcher() -> Result<(), MatchError> {
+        struct A(u8, u8);
+        struct Main(A, A);
+        seq!(other<'a>: u8 => A = a <= _, b <= _, {
+            A(a, b)
+        });
+
+        seq!(main<'a>: u8 => Main = a <= other, b <= other, {
+            Main(a, b)
+        });
+
+        let v : Vec<u8> = vec![0x00, 0x11, 0x22, 0x33];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i)?;
+
+        assert_eq!( o.item.0.0, 0x00 );
+        assert_eq!( o.item.0.1, 0x11 );
+        assert_eq!( o.item.1.0, 0x22 );
+        assert_eq!( o.item.1.1, 0x33 );
+
+        Ok(())
+    }
 
     #[test]
     fn seq_should_handle_bytes() -> Result<(), MatchError> {
