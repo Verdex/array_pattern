@@ -5,7 +5,7 @@
 
 #[derive(Debug)]
 pub enum MatchResult<T> {
-    Success(usize, T),  // TODO Success { start: usize, end: usize, item: T}
+    Success { start: usize, end: usize, item: T },  
     Error,
     Fatal(usize), 
     FatalEndOfFile,
@@ -18,20 +18,27 @@ macro_rules! seq {
     // TODO pat has given me some problems with literals
     // TODO be able to call other parsers
 
-    (err, $rp:ident, $input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
+    (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
-            Some(y @ (i, $p)) => y,
+            Some(y @ (i, $p)) => {
+                $start = i;
+                $end = i;
+                y
+            },
             _ => { 
                 std::mem::swap(&mut $rp, $input); 
                 return MatchResult::Error; 
             },
         };
-        seq!(fatal, $rp, $input, $($rest)*);
+        seq!(fatal, $rp, $input, $start, $end, $($rest)*);
     };
 
-    (fatal, $rp:ident, $input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
+    (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
-            Some(y @ (i, $p)) => y,
+            Some(y @ (i, $p)) => {
+                $end = i;
+                y
+            },
             Some((i, _)) => {
                 std::mem::swap(&mut $rp, $input); 
                 return MatchResult::Fatal(i);  
@@ -41,17 +48,20 @@ macro_rules! seq {
                 return MatchResult::FatalEndOfFile;  
             },
         };
-        seq!(fatal, $rp, $input, $($rest)*);
+        seq!(fatal, $rp, $input, $start, $end, $($rest)*);
     };
 
-    ($mode:ident, $rp:ident, $input:ident, $b:block) => {
-        return MatchResult::Success(0, $b);
+    ($mode:ident, $rp:ident, $input:ident, $start:ident, $end:ident, $b:block) => {
+        let item = $b;
+        return MatchResult::Success { start: $start, end: $end, item: item };
     };
 
     ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
         fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> MatchResult<$out_t> {
             let mut rp = input.clone();
-            seq!(err, rp, input, $($rest)*);
+            let mut start : usize = 0;
+            let mut end : usize = 0;
+            seq!(err, rp, input, start, end, $($rest)*);
         }
     };
 }
@@ -63,6 +73,11 @@ mod tests {
     use std::iter::Enumerate;
 
     // TODO test reset on failure
+    // TODO test fatal end of file
+    // TODO test fatal index
+    // TODO test success single index size
+    // TODO test success multi index size
+    // TODO test char indicies
 
     #[test]
     fn it_works() {
