@@ -99,6 +99,13 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
+    // TODO test calling other matcher that fails resets stream from its perspective
+    // TODO test calling other matcher results in correct fatal index
+    // TODO test calling other matcher results in correct fatal end of file
+    // TODO test calling other matcher results in correct error
+    // TODO test calling other matcher results in correct start/end values
+
+
     #[test]
     fn seq_should_handle_bytes() -> Result<(), MatchError> {
         struct Output {
