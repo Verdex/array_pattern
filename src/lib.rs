@@ -20,10 +20,10 @@ macro_rules! seq {
 
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
-            Some(y @ (i, $p)) => {
+            Some((i, item @ $p)) => {
                 $start = i;
                 $end = i;
-                y
+                item
             },
             _ => { 
                 std::mem::swap(&mut $rp, $input); 
@@ -35,9 +35,9 @@ macro_rules! seq {
 
     (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
-            Some(y @ (i, $p)) => {
+            Some((i, item @ $p)) => {
                 $end = i;
-                y
+                item
             },
             Some((i, _)) => {
                 std::mem::swap(&mut $rp, $input); 
@@ -59,7 +59,9 @@ macro_rules! seq {
     ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
         fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> MatchResult<$out_t> {
             let mut rp = input.clone();
+            #[allow(unused)]
             let mut start : usize = 0;
+            #[allow(unused)]
             let mut end : usize = 0;
             seq!(err, rp, input, start, end, $($rest)*);
         }
@@ -70,8 +72,6 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
-    use std::iter::Enumerate;
-
     // TODO test reset on failure
     // TODO test fatal end of file
     // TODO test fatal index
@@ -80,24 +80,47 @@ mod tests {
     // TODO test char indicies
 
     #[test]
-    fn it_works() {
-        enum X {
-            A, B
+    fn should_handle_single_item_match() {
+        enum Input {
+            A, 
+            #[allow(unused)]
+            B,
         }
 
-        seq!(blarg<'a>: &'a X => u8 = a <= X::A, { 
-            let _ = a;
-            4
+        enum Output {
+            A,
+            #[allow(unused)]
+            B,
+        }
+
+        seq!(m<'a>: &'a Input => Output = a <= Input::A, { 
+            match a {
+                Input::A => Output::A,
+                _ => panic!("input not A"),
+            }
         });
 
-        seq!(other<'a>: &'a X => u8 = a <= X::A, b <= X::B, { 
-            let _ = a;
-            4
-        });
+        let v = vec![Input::A];
+        let mut i = v.iter().enumerate();
 
-        let z = vec![X::A];
-        let mut y = z.iter().enumerate();
+        let o = m(&mut i);
 
-        let w = other(&mut y);
+        assert!( matches!( o, MatchResult::Success{ item: Output::A, .. } ) );
+    }
+
+
+    #[test]
+    fn should_handle_multiple_item_match() {
+
+    }
+
+    #[test]
+    fn should_handle_owned_item_match() {
+
+    }
+
+    #[test]
+    fn should_handle_string_match() {
+
     }
 }
