@@ -4,14 +4,6 @@
 // TODO one or more
 
 #[derive(Debug)]
-pub enum MatchResult<T> {
-    Success { start: usize, end: usize, item: T },  
-    Error,
-    Fatal(usize), 
-    FatalEndOfFile,
-}
-
-#[derive(Debug)]
 pub enum MatchError {
     Error(usize),
     ErrorEndOfFile,
