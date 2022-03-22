@@ -1,6 +1,13 @@
 
+// TODO maybe
+// TODO zero or more
+// TODO one or more
+
 #[macro_export]
 macro_rules! seq {
+
+    // TODO error out by mentioning the index number
+    // TODO be able to call other parsers
 
     ($input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
