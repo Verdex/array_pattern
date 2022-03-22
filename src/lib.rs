@@ -85,8 +85,76 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
-    // TODO test success single index size
-    // TODO test success multi index size
+    #[test]
+    fn seq_should_show_multiple_index_success_with_more_rules() -> Result<(), MatchError> {
+        seq!(s<'a>: char => char = _a <= _, _b <= _, _c <= _, _d <= _, {
+            'x'
+        });
+
+        let v = "xxxxyyyy";
+        let mut i = v.char_indices();
+
+        let _ = s(&mut i)?;
+        let success = s(&mut i)?;
+
+        assert_eq!( success.start, 4 );
+        assert_eq!( success.end, 7 );
+
+        Ok(())
+    }
+
+    #[test]
+    fn seq_should_show_multiple_index_success() -> Result<(), MatchError> {
+        seq!(s<'a>: char => char = _a <= _, _b <= _, {
+            'x'
+        });
+
+        let v = "xxyy";
+        let mut i = v.char_indices();
+
+        let _ = s(&mut i)?;
+        let success = s(&mut i)?;
+
+        assert_eq!( success.start, 2 );
+        assert_eq!( success.end, 3 );
+
+        Ok(())
+    }
+
+    #[test]
+    fn seq_should_show_single_index_success() -> Result<(), MatchError> {
+        seq!(s<'a>: char => char = _a <= _, {
+            'x'
+        });
+
+        let v = "x";
+        let mut i = v.char_indices();
+
+        let success = s(&mut i)?;
+
+        assert_eq!( success.start, 0 );
+        assert_eq!( success.end, 0 );
+
+        Ok(())
+    }
+
+    #[test]
+    fn seq_should_show_single_index_success_at_nonzero() -> Result<(), MatchError> {
+        seq!(s<'a>: char => char = _a <= _, {
+            'x'
+        });
+
+        let v = "xx";
+        let mut i = v.char_indices();
+
+        let _ = s(&mut i)?;
+        let success = s(&mut i)?;
+
+        assert_eq!( success.start, 1 );
+        assert_eq!( success.end, 1 );
+
+        Ok(())
+    }
 
     #[test]
     fn seq_should_indicate_first_item_error_from_end_of_file() {
