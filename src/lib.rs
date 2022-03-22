@@ -14,7 +14,6 @@ pub enum MatchResult<T> {
 #[macro_export]
 macro_rules! seq {
 
-    // TODO predicates?
     // TODO pat has given me some problems with literals
     // TODO be able to call other parsers
 
