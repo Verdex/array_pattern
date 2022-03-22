@@ -11,6 +11,7 @@ pub enum MatchResult<T> {
     FatalEndOfFile,
 }
 
+#[derive(Debug)]
 pub enum MatchError {
     Error,
     Fatal(usize), 
@@ -71,11 +72,9 @@ macro_rules! seq {
     ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
         fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<$out_t>, MatchError> {
             let mut rp = input.clone();
-            #[allow(unused)]
-            let mut start : usize = 0;
-            #[allow(unused)]
-            let mut end : usize = 0;
-            seq!(err, rp, input, start, end, $($rest)*);
+            let mut _start : usize = 0;
+            let mut _end : usize = 0;
+            seq!(err, rp, input, _start, _end, $($rest)*);
         }
     };
 }
@@ -89,7 +88,6 @@ mod tests {
     // TODO test fatal index
     // TODO test success single index size
     // TODO test success multi index size
-    // TODO test char indicies
 
     #[test]
     fn should_handle_single_item_match() {
@@ -117,7 +115,7 @@ mod tests {
 
         let o = m(&mut i);
 
-        assert!( matches!( o, MatchResult::Success{ item: Output::A, .. } ) );
+        assert!( matches!( o, Ok( Success{ item: Output::A, .. } ) ) );
     }
 
 
@@ -157,7 +155,7 @@ mod tests {
 
         let o = m(&mut i);
 
-        assert!( matches!( o, MatchResult::Success{ item: Output { a: OutputCase::A, b: OutputCase::B }, .. } ) );
+        assert!( matches!( o, Ok( Success{ item: Output { a: OutputCase::A, b: OutputCase::B }, .. } ) ) );
     }
 
     #[test]
@@ -181,7 +179,7 @@ mod tests {
 
         let o = m(&mut i);
 
-        assert!( matches!( o, MatchResult::Success{ item: Output { a: Input::A, b: Input::B }, .. } ) );
+        assert!( matches!( o, Ok( Success{ item: Output { a: Input::A, b: Input::B }, .. } ) ) );
     }
 
     #[test]
@@ -197,6 +195,25 @@ mod tests {
 
         let o = m(&mut i);
 
-        assert!( matches!( o, MatchResult::Success{ item: C('a'), .. } ) );
+        assert!( matches!( o, Ok( Success{ item: C('a'), .. } ) ) );
+    }
+
+    #[test]
+    fn should_preserve_changes_from_previous_match() -> Result<(), MatchError> {
+
+        seq!(one<'a>: char => char = a <= _, {
+            a
+        });
+
+        let v = "abc";
+        let mut i = v.char_indices();
+
+        let first = one(&mut i)?;
+        let second = one(&mut i)?;
+
+        assert_eq!( first.item, 'a' );
+        assert_eq!( second.item, 'b' );
+
+        Ok(())
     }
 }
