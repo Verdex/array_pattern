@@ -5,9 +5,10 @@
 
 #[derive(Debug)]
 pub enum MatchResult<T> {
-    Success(usize, T),
+    Success(usize, T),  // TODO Success { start: usize, end: usize, item: T}
     Error,
-    Fatal(usize)
+    Fatal(usize) // TODO Fatal { start: usize, end: usize }
+    // TODO FatalEndOfFile ?
 }
 
 #[macro_export]
@@ -31,7 +32,11 @@ macro_rules! seq {
     (fatal, $rp:ident, $input:ident, $n:ident <= $p:pat, $($rest:tt)*) => {
         let $n = match $input.next() {
             Some(y @ (i, $p)) => y,
-            _ => { return MatchResult::Fatal(0); },
+            // TODO Some((i, _)) => ...
+            _ => { 
+                std::mem::swap(&mut $rp, $input); 
+                return MatchResult::Fatal(0);  // TODO FatalEndOfFile?
+            },
         };
         seq!(fatal, $rp, $input, $($rest)*);
     };
@@ -50,9 +55,31 @@ macro_rules! seq {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    use std::iter::Enumerate;
+
+    // TODO test reset on failure
+
     #[test]
     fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+        enum X {
+            A, B
+        }
+
+        seq!(blarg<'a>: &'a X => u8 = a <= X::A, { 
+            let _ = a;
+            4
+        });
+
+        seq!(other<'a>: &'a X => u8 = a <= X::A, b <= X::B, { 
+            let _ = a;
+            4
+        });
+
+        let z = vec![X::A];
+        let mut y = z.iter().enumerate();
+
+        let w = other(&mut y);
     }
 }
