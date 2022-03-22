@@ -90,7 +90,7 @@ mod tests {
     // TODO test success multi index size
 
     #[test]
-    fn should_handle_single_item_match() {
+    fn seq_should_handle_single_item_match() {
         enum Input {
             A, 
             #[allow(unused)]
@@ -120,7 +120,7 @@ mod tests {
 
 
     #[test]
-    fn should_handle_multiple_item_match() {
+    fn seq_should_handle_multiple_item_match() {
         enum Input {
             A, 
             B,
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn should_handle_owned_item_match() {
+    fn seq_should_handle_owned_item_match() {
         enum Input {
             A, 
             B,
@@ -183,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn should_handle_string_match() {
+    fn seq_should_handle_string_match() {
         struct C(char);
 
         seq!(m<'a>: char => C = a <= 'a', {
@@ -199,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn should_preserve_changes_from_previous_match() -> Result<(), MatchError> {
+    fn seq_should_preserve_changes_from_previous_match() -> Result<(), MatchError> {
 
         seq!(one<'a>: char => char = a <= _, {
             a
