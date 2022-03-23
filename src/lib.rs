@@ -98,13 +98,17 @@ macro_rules! seq {
 
     (zero_or_more ~ $matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
         fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<Vec<$out_t>>, MatchError> {
-            let mut _rp = input.clone();
-            let mut _start : usize = 0;
-            let mut _end : usize = 0;
-            let mut matcher = || { seq!(err, _rp, input, _start, _end, $($rest)*); };
+
+            fn matcher<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<$out_t>, MatchError> {
+                let mut _rp = input.clone();
+                let mut _start : usize = 0;
+                let mut _end : usize = 0;
+                seq!(err, _rp, input, _start, _end, $($rest)*);
+            }
+
             let mut ret = vec![];
 
-            let mut result = matcher();
+            let mut result = matcher(input);
             let mut _start = 0;
             let mut _end = 0;
             match result {
@@ -120,7 +124,7 @@ macro_rules! seq {
             }
 
             loop {
-                result = matcher();
+                result = matcher(input);
                 match result {
                     Ok(s) => { 
                         _end = s.end;
@@ -158,6 +162,96 @@ macro_rules! seq {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zero_or_more_should_work_inside_of_seq() -> Result<(), MatchError> {
+        struct Output {
+            a : u8,
+            b : Vec<u8>,
+            c : u8,
+        }
+        seq!(zero_or_more ~ something<'a> : u8 => u8 = a <= 0x00, {
+            a
+        });
+
+        seq!(main<'a> : u8 => Output = a <= 0xFF, b <= something, c <= 0xAA, {
+            Output { a, b, c }
+        });
+
+        let v : Vec<u8> = vec![0xFF, 0x00, 0x00, 0x00, 0xAA, 0x88];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i)?;
+
+        assert_eq!( o.item.a, 0xFF );
+        assert_eq!( o.item.b.len(), 3 );
+        assert_eq!( o.item.b[0], 0x00 );
+        assert_eq!( o.item.b[1], 0x00 );
+        assert_eq!( o.item.b[2], 0x00 );
+        assert_eq!( o.item.c, 0xAA );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 4 );
+
+        assert_eq!( i.next().unwrap(), (5, 0x88) );
+
+        Ok(())
+    }
+
+    #[test]
+    fn zero_or_more_should_handle_multiple() -> Result<(), MatchError> {
+        seq!(zero_or_more ~ something<'a> : u8 => u8 = a <= 0x00, {
+            a
+        });
+
+        let v : Vec<u8> = vec![0x00, 0x00, 0x00, 0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i)?;
+
+        assert_eq!( o.item.len(), 3 );
+        assert_eq!( o.item[0], 0x00 );
+        assert_eq!( o.item[1], 0x00 );
+        assert_eq!( o.item[2], 0x00 );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 2 );
+
+        assert_eq!( i.next().unwrap(), (3, 0xFF) );
+
+        Ok(())
+    }
+
+    #[test]
+    fn zero_or_more_should_handle_single() -> Result<(), MatchError> {
+        seq!(zero_or_more ~ something<'a> : u8 => u8 = a <= 0x00, {
+            a
+        });
+
+        let v : Vec<u8> = vec![0x00, 0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i)?;
+
+        assert_eq!( o.item.len(), 1 );
+        assert_eq!( o.item[0], 0x00 );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 0 );
+        Ok(())
+    }
+
+    #[test]
+    fn zero_or_more_should_handle_nothing() -> Result<(), MatchError> {
+        seq!(zero_or_more ~ something<'a> : u8 => u8 = _a <= 0x00, {
+            0x00
+        });
+
+        let v : Vec<u8> = vec![0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i)?;
+
+        assert_eq!( o.item.len(), 0 );
+        Ok(())
+    }
 
     #[test]
     fn maybe_should_handle_call_from_other_matcher() -> Result<(), MatchError> {
