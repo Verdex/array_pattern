@@ -1,5 +1,4 @@
 
-// TODO maybe
 // TODO zero or more
 // TODO one or more
 // TODO or ?
@@ -98,16 +97,16 @@ macro_rules! seq {
     };
 
     (maybe ~ $matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
-        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Option<Success<$out_t>>, MatchError> {
+        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<Option<$out_t>>, MatchError> {
             let mut _rp = input.clone();
             let mut _start : usize = 0;
             let mut _end : usize = 0;
             let mut matcher = || { seq!(err, _rp, input, _start, _end, $($rest)*); };
             let result = matcher();
             match result {
-                Ok(v) => Ok(Some(v)),
-                Err(MatchError::Error(_)) => Ok(None),
-                Err(MatchError::ErrorEndOfFile) => Ok(None),
+                Ok(Success{ item, start, end }) => Ok(Success{ item: Some(item), start, end }),
+                Err(MatchError::Error(i)) => Ok(Success{ item: None, start: i, end: i }),
+                Err(MatchError::ErrorEndOfFile) => Ok(Success{ item: None, start: 0, end: 0 }),
                 Err(MatchError::Fatal(i)) => Err(MatchError::Fatal(i)),
                 Err(MatchError::FatalEndOfFile) => Err(MatchError::FatalEndOfFile),
             }
@@ -120,10 +119,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn maybe_() {
-        seq!(maybe ~ something<'a> : u8 => u8 = a <= _, {
+    fn maybe_should_handle_call_from_other_matcher() -> Result<(), MatchError> {
+        struct Output {
+            a : Option<u8>,
+            b : u8,
+        }
+        seq!(maybe ~ something<'a> : u8 => u8 = a <= 0x00, {
             a
         });
+
+        seq!(main<'a>: u8 => Output = a <= something, b <= 0xFF, {
+            Output { a, b }
+        });
+
+        let v : Vec<u8> = vec![0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i)?;
+
+        assert!( matches!( o.item.a, None ) );
+        assert_eq!( o.item.b, 0xFF );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 0 );
+        Ok(())
+    }
+
+    #[test]
+    fn maybe_should_handle_non_existing_item() {
+        seq!(maybe ~ something<'a> : u8 => u8 = a <= 0xFF, {
+            a
+        });
+
+        let v : Vec<u8> = vec![0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i);
+
+        assert!( matches!( o, Ok( Success { item: None, .. } ) ) );
+    }
+
+    #[test]
+    fn maybe_should_handle_existing_item() {
+        seq!(maybe ~ something<'a> : u8 => u8 = a <= 0xFF, {
+            a
+        });
+
+        let v : Vec<u8> = vec![0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i);
+
+        assert!( matches!( o, Ok( Success { item: Some(0xFF), .. } ) ) );
     }
 
     #[test]
