@@ -161,13 +161,57 @@ macro_rules! seq {
 mod tests {
     use super::*;
 
-    // TODO zero or more fatals on fatal
-    // TODO zero or more fatal end of file on fatal end of file
-    // TODO zero or more is cool with error end of file
-    // TODO zero or more can handle calling out to another matcher
-    // TODO zero or more can handle more than one sequence rule (ie a <= ?, b <= ?)
-    
-    // TODO one or more tests
+    #[test]
+    fn zero_or_more_should_handle_calling_to_another_matcher() -> Result<(), MatchError> {
+        assert!( false );
+        Ok(())
+    }
+
+    #[test]
+    fn zero_or_more_should_handle_more_than_one_rule() -> Result<(), MatchError> {
+        seq!(zero_or_more ~ something<'a> : u8 => u16 = a <= _, b <= _, {
+            ((a as u16) << 8) | (b as u16) 
+        });
+
+        let v : Vec<u8> = vec![0x01, 0x02, 0x03, 0x04];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i)?;
+
+        assert_eq!( o.item.len(), 2 );
+        assert_eq!( o.item[0], 0x0102 );
+        assert_eq!( o.item[1], 0x0304 );
+
+        Ok(())
+    }
+
+    #[test]
+    fn zero_or_more_inidicates_fatal_eof_on_fatal_eof() {
+        seq!(zero_or_more ~ something<'a> : u8 => () = _a <= 0x00, _b <= 0xFF, {
+            ()
+        });
+
+        let v : Vec<u8> = vec![0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i);
+
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile) ) );
+    } 
+
+    #[test]
+    fn zero_or_more_inidicates_fatal_on_fatal() {
+        seq!(zero_or_more ~ something<'a> : u8 => () = _a <= 0x00, _b <= 0xFF, {
+            ()
+        });
+
+        let v : Vec<u8> = vec![0x00, 0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = something(&mut i);
+
+        assert!( matches!( o, Err(MatchError::Fatal(1)) ) );
+    } 
 
     #[test]
     fn zero_or_more_should_work_inside_of_seq() -> Result<(), MatchError> {
