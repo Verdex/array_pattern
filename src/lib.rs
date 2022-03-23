@@ -1,6 +1,4 @@
 
-// TODO zero or more
-// TODO one or more
 // TODO or ?
 
 #[derive(Debug)]
@@ -162,6 +160,14 @@ macro_rules! seq {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO zero or more fatals on fatal
+    // TODO zero or more fatal end of file on fatal end of file
+    // TODO zero or more is cool with error end of file
+    // TODO zero or more can handle calling out to another matcher
+    // TODO zero or more can handle more than one sequence rule (ie a <= ?, b <= ?)
+    
+    // TODO one or more tests
 
     #[test]
     fn zero_or_more_should_work_inside_of_seq() -> Result<(), MatchError> {
