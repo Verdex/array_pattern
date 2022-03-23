@@ -96,6 +96,47 @@ macro_rules! seq {
         }
     };
 
+    (zero_or_more ~ $matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
+        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<Vec<$out_t>>, MatchError> {
+            let mut _rp = input.clone();
+            let mut _start : usize = 0;
+            let mut _end : usize = 0;
+            let mut matcher = || { seq!(err, _rp, input, _start, _end, $($rest)*); };
+            let mut ret = vec![];
+
+            let mut result = matcher();
+            let mut _start = 0;
+            let mut _end = 0;
+            match result {
+                Ok(s) => { 
+                    _start = s.start;
+                    _end = s.end;
+                    ret.push(s.item);
+                },
+                Err(MatchError::Error(i)) => { return Ok(Success{ item: ret, start: i, end: i }); },
+                Err(MatchError::ErrorEndOfFile) => { return Ok(Success{ item: ret, start: 0, end: 0 }); },
+                Err(MatchError::Fatal(i)) => { return Err(MatchError::Fatal(i)); },
+                Err(MatchError::FatalEndOfFile) => { return Err(MatchError::FatalEndOfFile); },
+            }
+
+            loop {
+                result = matcher();
+                match result {
+                    Ok(s) => { 
+                        _end = s.end;
+                        ret.push(s.item);
+                    },
+                    Err(MatchError::Error(_)) => { break; },
+                    Err(MatchError::ErrorEndOfFile) => { break; },
+                    Err(MatchError::Fatal(i)) => { return Err(MatchError::Fatal(i)); },
+                    Err(MatchError::FatalEndOfFile) => { return Err(MatchError::FatalEndOfFile); },
+                }
+            }
+
+            Ok(Success{ item: ret, start: _start, end: _end })
+        }
+    };
+
     (maybe ~ $matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($rest:tt)*) => {
         fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<Option<$out_t>>, MatchError> {
             let mut _rp = input.clone();
