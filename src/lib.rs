@@ -1,5 +1,4 @@
 
-// TODO or ?
 
 #[derive(Debug)]
 pub enum MatchError {
