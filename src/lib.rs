@@ -17,6 +17,30 @@ pub struct Success<T> {
 }
 
 #[macro_export]
+macro_rules! alt {
+
+    ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $($m:ident)|+) => {
+        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<$out_t>, MatchError> {
+
+            let mut _error : Option<MatchError> = None;
+
+            $(
+                match $m(input) {
+                    Ok(v) => { return Ok(v); },
+                    e @ Err(MatchError::Fatal(_)) => { return e; },
+                    e @ Err(MatchError::FatalEndOfFile) => { return e; },
+                    Err(e @ MatchError::Error(_)) => { _error = Some(e); },
+                    Err(e @ MatchError::ErrorEndOfFile) => { _error = Some(e); },
+                }
+
+            )*
+        
+            Err(_error.unwrap())
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! seq {
 
     (err, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
@@ -160,6 +184,161 @@ macro_rules! seq {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn alt_should_work_inside_seq() -> Result<(), MatchError> {
+        seq!(a<'a> : u8 => u8 = o <= 0x00, {
+            o
+        });
+
+        seq!(b<'a> : u8 => u8 = o <= 0xFF, {
+            o
+        });
+
+        alt!(c<'a> : u8 => u8 = a | b);
+
+        struct Output {
+            init: u8,
+            second: u8,
+        }
+        
+        seq!(zero_or_more ~ main<'a> : u8 => Output = init <= 0xAA, second <= c, {
+            Output { init, second }
+        });
+
+        let v : Vec<u8> = vec![0xAA, 0xFF, 0xAA, 0x00, 0xAA, 0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i)?;
+
+        assert_eq!( o.item.len(), 3 );
+        assert_eq!( o.item[0].init, 0xAA );
+        assert_eq!( o.item[0].second, 0xFF );
+
+        assert_eq!( o.item[1].init, 0xAA );
+        assert_eq!( o.item[1].second, 0x00 );
+
+        assert_eq!( o.item[2].init, 0xAA );
+        assert_eq!( o.item[2].second, 0x00 );
+
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 5 );
+        
+        Ok(())
+    }
+
+    #[test]
+    fn alt_should_return_last_error_eof_for_total_failure() {
+        seq!(a<'a> : u8 => () = _o <= 0x00, {
+            ()
+        });
+
+        seq!(b<'a> : u8 => () = _o <= 0x00, {
+            ()
+        });
+
+        alt!(c<'a> : u8 => () = a | b);
+
+        let v : Vec<u8> = vec![];
+        let mut i = v.into_iter().enumerate();
+
+        let o = c(&mut i);
+
+        assert!( matches!( o, Err(MatchError::ErrorEndOfFile) ) );
+    }
+
+    #[test]
+    fn alt_should_return_last_error_for_total_failure() {
+        seq!(a<'a> : u8 => () = _o <= 0x00, {
+            ()
+        });
+
+        seq!(b<'a> : u8 => () = _o <= 0x00, {
+            ()
+        });
+
+        alt!(c<'a> : u8 => () = a | b);
+
+        let v : Vec<u8> = vec![0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = c(&mut i);
+
+        assert!( matches!( o, Err(MatchError::Error(0)) ) );
+    }
+
+    #[test]
+    fn alt_should_indicate_fatal_eof_if_fatal_eof() {
+        seq!(a<'a> : u8 => () = _o <= 0x00, _x <= 0x00, {
+            ()
+        });
+
+        seq!(b<'a> : u8 => () = _o <= 0x00, _x <= 0x00, {
+            ()
+        });
+
+        alt!(c<'a> : u8 => () = a | b);
+
+        let v : Vec<u8> = vec![0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = c(&mut i);
+
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile) ) );
+    }
+
+    #[test]
+    fn alt_should_indicate_fatal_if_fatal() {
+        seq!(a<'a> : u8 => () = _o <= 0x00, _x <= 0x00, {
+            ()
+        });
+
+        seq!(b<'a> : u8 => () = _o <= 0x00, _x <= 0x00, {
+            ()
+        });
+
+        alt!(c<'a> : u8 => () = a | b);
+
+        let v : Vec<u8> = vec![0x00, 0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = c(&mut i);
+
+        assert!( matches!( o, Err(MatchError::Fatal(_) ) ) );
+    }
+
+    #[test]
+    fn alt_should_succeeds_if_any_matcher_succeeds() -> Result<(), MatchError> {
+        seq!(a<'a> : u8 => u8 = o <= 0x00, {
+            o
+        });
+
+        seq!(b<'a> : u8 => u8 = o <= 0xFF, {
+            o
+        });
+
+        alt!(c<'a> : u8 => u8 = a | b);
+
+        let v : Vec<u8> = vec![0x00];
+        let mut i = v.into_iter().enumerate();
+
+        let o = c(&mut i)?;
+
+        assert_eq!(o.item, 0x00);
+        assert_eq!(o.start, 0);
+        assert_eq!(o.end, 0);
+
+        let v : Vec<u8> = vec![0xFF];
+        let mut i = v.into_iter().enumerate();
+
+        let o = c(&mut i)?;
+
+        assert_eq!(o.item, 0xFF);
+        assert_eq!(o.start, 0);
+        assert_eq!(o.end, 0);
+
+        Ok(())
+    }
 
     #[test]
     fn zero_or_more_should_handle_calling_to_another_matcher() -> Result<(), MatchError> {
