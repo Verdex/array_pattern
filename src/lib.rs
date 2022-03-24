@@ -163,7 +163,23 @@ mod tests {
 
     #[test]
     fn zero_or_more_should_handle_calling_to_another_matcher() -> Result<(), MatchError> {
-        assert!( false );
+        seq!(ushort<'a> : u8 => u16 = a <= _, b <= _, {
+            ((a as u16) << 8) | (b as u16) 
+        });
+
+        seq!(zero_or_more ~ main<'a> : u8 => u16 = x <= ushort, {
+            x
+        });
+
+        let v : Vec<u8> = vec![0x01, 0x02, 0x03, 0x04];
+        let mut i = v.into_iter().enumerate();
+
+        let o = main(&mut i)?;
+
+        assert_eq!( o.item.len(), 2 );
+        assert_eq!( o.item[0], 0x0102 );
+        assert_eq!( o.item[1], 0x0304 );
+
         Ok(())
     }
 
