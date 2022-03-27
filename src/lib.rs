@@ -3,9 +3,9 @@
 #[derive(Debug)]
 pub enum MatchError {
     Error(usize),
-    ErrorEndOfFile,
+    ErrorEndOfFile(usize),
     Fatal(usize), 
-    FatalEndOfFile,
+    FatalEndOfFile(usize),
 }
 
 #[derive(Debug)]
@@ -27,9 +27,9 @@ macro_rules! alt {
                 match $m(input) {
                     Ok(v) => { return Ok(v); },
                     e @ Err(MatchError::Fatal(_)) => { return e; },
-                    e @ Err(MatchError::FatalEndOfFile) => { return e; },
+                    e @ Err(MatchError::FatalEndOfFile(_)) => { return e; },
                     Err(e @ MatchError::Error(_)) => { _error = Some(e); },
-                    Err(e @ MatchError::ErrorEndOfFile) => { _error = Some(e); },
+                    Err(e @ MatchError::ErrorEndOfFile(_)) => { _error = Some(e); },
                 }
 
             )*
@@ -53,13 +53,15 @@ macro_rules! seq {
     (fatal, $rp:ident, $input:ident, $start:ident, $end:ident, $n:ident <= $matcher:ident, $($rest:tt)*) => {
         let $n = match $matcher($input) {
             Ok(v) => {
-                $end = v.end;
+                if $end < v.end {
+                    $end = v.end;
+                }
                 v.item
             },
             Err(MatchError::Fatal(i)) => return Err(MatchError::Fatal(i)),
             Err(MatchError::Error(i)) => return Err(MatchError::Fatal(i)),
-            Err(MatchError::FatalEndOfFile) => return Err(MatchError::FatalEndOfFile),
-            Err(MatchError::ErrorEndOfFile) => return Err(MatchError::FatalEndOfFile),
+            Err(MatchError::FatalEndOfFile(i)) => return Err(MatchError::FatalEndOfFile(i)),
+            Err(MatchError::ErrorEndOfFile(i)) => return Err(MatchError::FatalEndOfFile(i)),
         };
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
     };
@@ -78,7 +80,7 @@ macro_rules! seq {
             },
             _ => { 
                 std::mem::swap(&mut $rp, $input); 
-                return Err(MatchError::ErrorEndOfFile); 
+                return Err(MatchError::ErrorEndOfFile($end)); 
             },
         };
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
@@ -97,7 +99,7 @@ macro_rules! seq {
             },
             _ => { 
                 std::mem::swap(&mut $rp, $input); 
-                return Err(MatchError::FatalEndOfFile);  
+                return Err(MatchError::FatalEndOfFile($end));  
             },
         };
         seq!(fatal, $rp, $input, $start, $end, $($rest)*);
@@ -139,9 +141,9 @@ macro_rules! seq {
                     ret.push(s.item);
                 },
                 Err(MatchError::Error(i)) => { return Ok(Success{ item: ret, start: i, end: i }); },
-                Err(MatchError::ErrorEndOfFile) => { return Ok(Success{ item: ret, start: 0, end: 0 }); },
+                Err(MatchError::ErrorEndOfFile(i)) => { return Ok(Success{ item: ret, start: i, end: i }); },
                 Err(MatchError::Fatal(i)) => { return Err(MatchError::Fatal(i)); },
-                Err(MatchError::FatalEndOfFile) => { return Err(MatchError::FatalEndOfFile); },
+                Err(MatchError::FatalEndOfFile(i)) => { return Err(MatchError::FatalEndOfFile(i)); },
             }
 
             loop {
@@ -152,9 +154,9 @@ macro_rules! seq {
                         ret.push(s.item);
                     },
                     Err(MatchError::Error(_)) => { break; },
-                    Err(MatchError::ErrorEndOfFile) => { break; },
+                    Err(MatchError::ErrorEndOfFile(_)) => { break; },
                     Err(MatchError::Fatal(i)) => { return Err(MatchError::Fatal(i)); },
-                    Err(MatchError::FatalEndOfFile) => { return Err(MatchError::FatalEndOfFile); },
+                    Err(MatchError::FatalEndOfFile(i)) => { return Err(MatchError::FatalEndOfFile(i)); },
                 }
             }
 
@@ -172,9 +174,9 @@ macro_rules! seq {
             match result {
                 Ok(Success{ item, start, end }) => Ok(Success{ item: Some(item), start, end }),
                 Err(MatchError::Error(i)) => Ok(Success{ item: None, start: i, end: i }),
-                Err(MatchError::ErrorEndOfFile) => Ok(Success{ item: None, start: 0, end: 0 }),
+                Err(MatchError::ErrorEndOfFile(i)) => Ok(Success{ item: None, start: i, end: i }),
                 Err(MatchError::Fatal(i)) => Err(MatchError::Fatal(i)),
-                Err(MatchError::FatalEndOfFile) => Err(MatchError::FatalEndOfFile),
+                Err(MatchError::FatalEndOfFile(i)) => Err(MatchError::FatalEndOfFile(i)),
             }
         }
     };
@@ -243,7 +245,7 @@ mod tests {
 
         let o = c(&mut i);
 
-        assert!( matches!( o, Err(MatchError::ErrorEndOfFile) ) );
+        assert!( matches!( o, Err(MatchError::ErrorEndOfFile(_)) ) );
     }
 
     #[test]
@@ -283,7 +285,7 @@ mod tests {
 
         let o = c(&mut i);
 
-        assert!( matches!( o, Err(MatchError::FatalEndOfFile) ) );
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile(_)) ) );
     }
 
     #[test]
@@ -390,7 +392,7 @@ mod tests {
 
         let o = something(&mut i);
 
-        assert!( matches!( o, Err(MatchError::FatalEndOfFile) ) );
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile(_)) ) );
     } 
 
     #[test]
@@ -595,7 +597,7 @@ mod tests {
 
         let o = main(&mut i);
 
-        assert!( matches!( o, Err(MatchError::FatalEndOfFile ) ) );
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile(_) ) ) );
     }
 
     #[test]
@@ -635,7 +637,7 @@ mod tests {
 
         let o = main(&mut i);
 
-        assert!( matches!( o, Err(MatchError::FatalEndOfFile ) ) );
+        assert!( matches!( o, Err(MatchError::FatalEndOfFile(_) ) ) );
     }
 
     #[test]
@@ -675,7 +677,7 @@ mod tests {
 
         let o = main(&mut i);
 
-        assert!( matches!( o, Err(MatchError::ErrorEndOfFile ) ) );
+        assert!( matches!( o, Err(MatchError::ErrorEndOfFile(_) ) ) );
     }
 
     #[test]
@@ -831,7 +833,7 @@ mod tests {
 
         let failure = f(&mut i);
 
-        assert!( matches!( failure, Err(MatchError::ErrorEndOfFile ) ) );
+        assert!( matches!( failure, Err(MatchError::ErrorEndOfFile(_) ) ) );
     }
 
     #[test]
@@ -876,7 +878,7 @@ mod tests {
 
         let failure = f(&mut i);
 
-        assert!( matches!( failure, Err(MatchError::FatalEndOfFile ) ) );
+        assert!( matches!( failure, Err(MatchError::FatalEndOfFile(_) ) ) );
     }
 
     #[test]
