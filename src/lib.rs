@@ -1031,4 +1031,68 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn end_should_be_set_correctly_after_zero_or_more_that_collects_nothing() -> Result<(), MatchError> {
+        seq!(zero_or_more ~ hs<'a> : char => char = h <= 'h', { h });
+        seq!(letter<'a> : char => char = a <= 'a', { a });
+        seq!(main<'a> : char => () = _a <= letter, _b <= hs, _c <= letter, { () });
+
+        let v = "aa";
+        let mut i = v.char_indices();
+
+        let output = main(&mut i)?;
+
+        assert_eq!( output.start, 0 );
+        assert_eq!( output.end, 1 );
+        Ok(())
+    }
+
+    #[test]
+    fn end_should_be_set_correctly_after_maybe_that_collects_nothing() -> Result<(), MatchError> {
+        seq!(maybe ~ hs<'a> : char => char = h <= 'h', { h });
+        seq!(letter<'a> : char => char = a <= 'a', { a });
+        seq!(main<'a> : char => () = _a <= letter, _b <= hs, _c <= letter, { () });
+
+        let v = "aa";
+        let mut i = v.char_indices();
+
+        let output = main(&mut i)?;
+
+        assert_eq!( output.start, 0 );
+        assert_eq!( output.end, 1 );
+        Ok(())
+    }
+
+    #[test]
+    fn end_should_be_set_correctly_with_ending_maybe_that_encounters_end_of_file() -> Result<(), MatchError> {
+        seq!(maybe ~ hs<'a> : char => char = h <= 'h', { h });
+        seq!(letter<'a> : char => char = a <= 'a', { a });
+        seq!(main<'a> : char => () = _a <= letter, _b <= letter, _c <= hs, { () });
+
+        let v = "aa";
+        let mut i = v.char_indices();
+
+        let output = main(&mut i)?;
+
+        assert_eq!( output.start, 0 );
+        assert_eq!( output.end, 1 );
+        Ok(())
+    }
+
+    #[test]
+    fn end_should_be_set_correctly_with_ending_zero_or_more_that_encounters_end_of_file() -> Result<(), MatchError> {
+        seq!(zero_or_more ~ hs<'a> : char => char = h <= 'h', { h });
+        seq!(letter<'a> : char => char = a <= 'a', { a });
+        seq!(main<'a> : char => () = _a <= letter, _b <= letter, _c <= hs, { () });
+
+        let v = "aa";
+        let mut i = v.char_indices();
+
+        let output = main(&mut i)?;
+
+        assert_eq!( output.start, 0 );
+        assert_eq!( output.end, 1 );
+        Ok(())
+    }
 }
