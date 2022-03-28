@@ -209,6 +209,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn pred_should_work_inside_seq() -> Result<(), MatchError> {
+        pred!(a<'a>: u8 => u8 = |x| x % 2 == 0);
+        seq!(zero_or_more ~ evens<'a>: u8 => u8 = e <= a, { e });
+
+        let v : Vec<u8> = vec![0x00, 0x02, 0x04, 0x03, 0x04, 0x05];
+        let mut i = v.into_iter().enumerate();
+
+        let o = evens(&mut i)?;
+
+        assert_eq!( o.item.len(), 3 );
+        assert_eq!( o.item[0], 0x00 );
+        assert_eq!( o.item[1], 0x02 );
+        assert_eq!( o.item[2], 0x04 );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 2 );
+
+        Ok(())
+
+    }
+
+    #[test]
+    fn pred_should_accept_matching_value() -> Result<(), MatchError> {
+        pred!(a<'a>: u8 => u8 = |x| x % 2 == 0);
+
+        let v : Vec<u8> = vec![0x02];
+        let mut i = v.into_iter().enumerate();
+
+        let o = a(&mut i)?;
+
+        assert_eq!( o.item, 0x02 );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 0 );
+
+        Ok(())
+    }
+
+    #[test]
     fn alt_should_work_inside_seq() -> Result<(), MatchError> {
         seq!(a<'a> : u8 => u8 = o <= 0x00, {
             o
