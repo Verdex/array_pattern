@@ -15,7 +15,14 @@ pub struct Success<T> {
     pub end : usize,
 }
 
-// TODO batch up definitions
+#[macro_export]
+macro_rules! group { 
+    ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = |$input:ident| $b:block) => {
+        fn $matcher_name<$life>($input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<$out_t>, MatchError> {
+            $b
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! pred {
@@ -207,6 +214,28 @@ macro_rules! seq {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn group_should_allow_grouping() -> Result<(), MatchError> {
+        group!(g<'a>: char => (char, char) = |input| { 
+            seq!(a<'a>: char => char = a <= 'a', { a });
+            seq!(b<'a>: char => char = b <= 'b', { b });
+            seq!(main<'a>: char => (char, char) = alet <= a, blet <= b, { (alet, blet) });
+
+            main(input)
+        });
+
+        let v = "ab"; 
+        let mut i = v.char_indices();
+
+        let o = g(&mut i)?;
+
+        assert_eq!( o.item, ('a', 'b') );
+        assert_eq!( o.start, 0 );
+        assert_eq!( o.end, 1 );
+
+        Ok(())
+    }
 
     #[test]
     fn pred_should_work_inside_seq() -> Result<(), MatchError> {
