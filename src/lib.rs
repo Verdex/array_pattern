@@ -15,6 +15,28 @@ pub struct Success<T> {
     pub end : usize,
 }
 
+// TODO batch up definitions
+
+#[macro_export]
+macro_rules! pred {
+    ($matcher_name:ident<$life:lifetime> : $in_t:ty => $out_t:ty = $predicate:expr) => {
+        fn $matcher_name<$life>(input : &mut (impl Iterator<Item = (usize, $in_t)> + Clone)) -> Result<Success<$out_t>, MatchError> {
+            let mut rp = input.clone();
+            match input.next() {
+                Some((i, c)) if $predicate(c) => Ok(Success { start: i, end: i, item: c }),
+                Some((i, _)) => { 
+                    std::mem::swap(&mut rp, input);
+                    Err(MatchError::Error(i))
+                },
+                None => {
+                    std::mem::swap(&mut rp, input);
+                    Err(MatchError::ErrorEndOfFile)
+                },
+            } 
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! alt {
 
